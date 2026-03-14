@@ -1,0 +1,812 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>"Fire"Wall</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: "Segoe UI", sans-serif;
+        }
+        body {
+            background: #333;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+        }
+        .app-window {
+            width: 2000px;
+            height: 1500px;
+            background: #fff;
+            border-radius: 8px;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            box-shadow: 0 0 30px rgba(0,0,0,0.3);
+        }
+        .title-bar {
+            height: 40px;
+            background: #eaeaea;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 12px;
+            border-bottom: 1px solid #ccc;
+        }
+        .win-buttons {
+            display: flex;
+            gap: 1px;
+        }
+        .win-btn {
+            width: 44px;
+            height: 40px;
+            display: grid;
+            place-items: center;
+        }
+        .min-icon {
+            width: 14px;
+            height: 2px;
+            background: #555;
+        }
+        .max-icon {
+            width: 14px;
+            height: 14px;
+            border: 2px solid #555;
+        }
+        .close-icon {
+            width: 14px;
+            height: 14px;
+            position: relative;
+        }
+        .close-icon::before,
+        .close-icon::after {
+            content: '';
+            position: absolute;
+            width: 2px;
+            height: 14px;
+            background: #555;
+            left: 6px;
+            top: 0;
+            transform: rotate(45deg);
+        }
+        .close-icon::after {
+            transform: rotate(-45deg);
+        }
+        .chat-area {
+            flex: 1;
+            padding: 65px;
+            overflow-y: auto;
+            background: url("./gw.jpg") no-repeat center center;
+            background-size: cover;
+            background-attachment: fixed;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+            will-change: scroll-position;
+            scroll-behavior: smooth;
+            position: relative;
+        }
+        .chat-area > * {
+            position: relative;
+            z-index: 1;
+        }
+        .msg-row {
+            display: flex;
+            max-width: 70%;
+            animation: msgRowPop 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+            opacity: 0;
+            transform: translateY(10px) scale(0.95);
+        }
+        .msg-row:nth-child(odd) {
+            animation-delay: 0.1s;
+        }
+        .msg-row:nth-child(even) {
+            animation-delay: 0.2s;
+        }
+        .msg-left {
+            align-self: flex-start;
+        }
+        .msg-right {
+            align-self: flex-end;
+            flex-direction: row-reverse;
+        }
+        .avatar {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, var(--avatar-color) 0%, darken(var(--avatar-color), 10%) 100%);
+            color: #fff;
+            font-weight: bold;
+            display: grid;
+            place-items: center;
+            flex-shrink: 0;
+            margin: 0 10px;
+            box-shadow:
+                0 4px 8px rgba(0, 0, 0, 0.12),
+                inset 0 1px 0 rgba(255, 255, 255, 0.2);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            position: relative;
+            overflow: hidden;
+            animation: avatarBounce 0.6s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
+            transform: scale(0);
+            opacity: 0;
+        }
+        .avatar {
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            position: relative;
+        }
+        .bubble {
+            padding: 12px 18px;
+            border-radius: 20px;
+            position: relative;
+            line-height: 1.4;
+            word-wrap: break-word;
+            word-break: break-word;
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            box-shadow:
+                0 4px 12px rgba(0, 0, 0, 0.08),
+                inset 0 1px 0 rgba(255, 255, 255, 0.1);
+            transition: all 0.2s ease;
+            animation: bubblePop 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+            opacity: 0;
+            transform: scale(0.9) translateY(5px);
+            transition: height 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94),
+                        width 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94),
+                        transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+        .bubble.line-change {
+            animation: lineBounce 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+        }
+        .bubble-original {
+            background: rgba(51, 51, 51, 0.85);
+            color: #fff;
+            border-top-left-radius: 4px;
+            animation-delay: 0.2s;
+        }
+        .bubble-right {
+            background: rgba(0, 122, 255, 0.85);
+            color: #fff;
+            border-top-right-radius: 4px;
+            animation-delay: 0.2s;
+        }
+        .bubble-translate {
+            background: #d1d1d6;
+            color: #111;
+            margin-top: 6px;
+            animation-delay: 0.4s;
+        }
+        .bubble-note {
+            background: #e5e5ea;
+            color: #111;
+            margin-top: 6px;
+            animation-delay: 0.6s;
+        }
+        .msg-group {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+        .msg-right .loading {
+            left: 12px;
+            right: auto;
+        }
+        @keyframes spin {
+            to {
+                transform: rotate(360deg);
+            }
+        }
+        .input-bar {
+            height: auto;
+            min-height: 60px;
+            border-top: 1px solid #eee;
+            display: flex;
+            align-items: center;
+            padding: 10px 16px;
+            gap: 10px;
+            position: relative;
+            background: #fff;
+        }
+        .input-bar::before {
+            content: "";
+            position: absolute;
+            top: -60px;
+            left: 0;
+            right: 0;
+            height: 60px;
+            background: linear-gradient(to bottom, transparent, #ffffff);
+            z-index: 2;
+        }
+        #inputBox {
+            flex: 1;
+            min-height: 40px;
+            max-height: 120px;
+            height: auto;
+            border-radius: 20px;
+            border: 1px solid #ddd;
+            padding: 10px 16px;
+            outline: none;
+            font-size: 15px;
+            line-height: 1.4;
+            resize: none;
+            overflow-y: auto;
+            display: flex;
+            align-items: flex-end;
+            scrollbar-width: none;
+            -ms-overflow-style: none;
+        }
+        #inputBox::-webkit-scrollbar {
+            display: none;
+        }
+        .chat-area::-webkit-scrollbar {
+            width: 8px;
+        }
+        .chat-area::-webkit-scrollbar-thumb {
+            background: #bbb;
+            border-radius: 4px;
+        }
+        .chat-area::-webkit-scrollbar-thumb:hover {
+            background: #999;
+        }
+        #sendBtn {
+            height: 48px;
+            padding: 0 24px;
+            border-radius: 24px;
+            background: linear-gradient(135deg, rgba(51, 153, 255, 0.5) 0%, rgba(0, 122, 255, 1) 50%, rgba(0, 88, 184, 0.75) 100%);
+            backdrop-filter: blur(15px);
+            -webkit-backdrop-filter: blur(15px);
+            color: #fff;
+            border: 1px solid rgba(255, 255, 255, 0.5);
+            box-shadow: 0 0 20px rgba(0, 122, 255, 0.4), 0 4px 12px rgba(0, 0, 0, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.6);
+            cursor: pointer;
+            font-size: 15px;
+            font-weight: 500;
+            position: relative;
+            overflow: hidden;
+            transition: background 0.5s cubic-bezier(0.25, 0.46, 0.45, 0.94),
+                        color 0.5s cubic-bezier(0.25, 0.46, 0.45, 0.94),
+                        border 0.5s cubic-bezier(0.25, 0.46, 0.45, 0.94),
+                        opacity 0.5s cubic-bezier(0.25, 0.46, 0.45, 0.94) !important;
+            opacity: 1;
+        }
+        #sendBtn:disabled {
+            background: #fff !important;
+            color: #007aff !important;
+            border: 1px solid #007aff !important;
+            cursor: not-allowed;
+            opacity: 0.6 !important;
+            transition: all 0.5s cubic-bezier(0.25, 0.46, 0.45, 0.94) !important;
+        }
+        #sendBtn:not(:disabled) {
+            animation: btnPulse 0.6s ease-in-out forwards;
+        }
+        @keyframes btnPulse {
+            0% {
+                transform: scale(1);
+            }
+            50% {
+                transform: scale(1.05);
+            }
+            100% {
+                transform: scale(1);
+            }
+        }
+        @keyframes msgRowPop {
+            0% {
+                opacity: 0;
+                transform: translateY(10px) scale(0.95);
+            }
+            70% {
+                opacity: 1;
+                transform: translateY(-2px) scale(1.02);
+            }
+            100% {
+                opacity: 1;
+                transform: translateY(0) scale(1);
+            }
+        }
+        @keyframes avatarBounce {
+            0% {
+                transform: scale(0);
+                opacity: 0;
+            }
+            60% {
+                transform: scale(1.1);
+                opacity: 1;
+            }
+            100% {
+                transform: scale(1);
+                opacity: 1;
+            }
+        }
+        @keyframes bubblePop {
+            0% {
+                opacity: 0;
+                transform: scale(0.9) translateY(5px);
+            }
+            60% {
+                transform: scale(1.03) translateY(-1px);
+                opacity: 1;
+            }
+            100% {
+                transform: scale(1) translateY(0);
+                opacity: 1;
+            }
+        }
+        @keyframes lineBounce {
+            0% {
+                transform: scale(1);
+            }
+            50% {
+                transform: scale(1.05) translateY(-2px);
+            }
+            100% {
+                transform: scale(1);
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="app-window">
+        <div class="title-bar">
+            <div>"Fire"Wall</div>
+            <div class="win-buttons">
+                <div class="win-btn"><div class="min-icon"></div></div>
+                <div class="win-btn"><div class="max-icon"></div></div>
+                <div class="win-btn"><div class="close-icon"></div></div>
+            </div>
+        </div>
+        <div class="chat-area" id="chatArea"></div>
+        <div class="input-bar">
+            <textarea id="inputBox" placeholder="输入消息..."></textarea>
+            <button id="sendBtn" disabled>发送</button>
+        </div>
+    </div>
+    <script>
+        const chatArea = document.getElementById('chatArea');
+        const inputBox = document.getElementById('inputBox');
+        const sendBtn = document.getElementById('sendBtn');
+
+        const soundEffects = {
+            receive: new Audio('./re.wav'),
+            send: new Audio('./se.wav')
+        };
+
+        function initSoundEffects() {
+            soundEffects.receive.volume = 0.5;
+            soundEffects.send.volume = 0.7;
+            
+            Object.values(soundEffects).forEach(audio => {
+                audio.preload = 'auto';
+                audio.onerror = () => {
+                    console.log(`音频加载失败: ${audio.src}`);
+                    audio.src = '';
+                };
+            });
+        }
+
+        function playSound(type) {
+            if (!soundEffects[type]) return;
+            
+            soundEffects[type].currentTime = 0;
+            try {
+                soundEffects[type].play().catch(err => {
+                    console.log('音效播放失败:', err);
+                });
+            } catch (e) {
+                console.log('音效播放异常:', e);
+            }
+        }
+
+        const MESSAGE_QUEUE = [
+            {
+                userId: 1,
+                original: "各位合作伙伴，大家好！非常荣幸能在这个阳光明媚的日子里与来自不同国家的朋友们相聚一堂，共同探讨我们未来在人工智能、跨境电商以及文化交流等多个领域的深度合作机会。",
+                translate: "Dear partners, hello everyone! It's a great honor to gather with friends from different countries on this sunny day to jointly explore opportunities for in-depth cooperation between us in multiple fields such as artificial intelligence, cross-border e-commerce, and cultural exchanges in the future.",
+                note: "中文商务开场常用“荣幸”“相聚一堂”等敬语，体现对合作的重视和对各方的尊重，长句中使用多个并列结构展现合作领域的广泛性。",
+                delayBefore: 1000,
+                loadingDuration: 800,
+                typeSpeedTranslate: 10,
+                typeSpeedNote: 10
+            },
+            {
+                userId: 2,
+                original: "Thank you for your warm welcome and kind words! I fully share your enthusiasm for our potential collaboration and believe that by combining our respective strengths in technology development, market expansion, and cultural understanding, we can create truly innovative solutions that benefit all parties involved.",
+                translate: "感谢您的热烈欢迎和友好致辞！我完全认同您对我们潜在合作的热情，并相信通过结合我们各自在技术开发、市场拓展和文化理解方面的优势，我们能够创造出真正创新的解决方案，惠及所有相关方。",
+                note: "英语商务表达中注重“respective strengths”（各自优势）的强调，使用“truly innovative solutions”突出创新价值，长句结构严谨，逻辑清晰。",
+                delayBefore: 1500,
+                loadingDuration: 800,
+                typeSpeedTranslate: 10,
+                typeSpeedNote: 10
+            },
+            {
+                userId: 3,
+                original: "この度は貴重な機会を与えていただき、誠にありがとうございます。私たちは日本市場におけるAI技術の応用経験とローカリゼーション戦略を活かし、皆様との連携を通じて、より柔軟で効率的なビジネスモデルを構築できると確信しております。",
+                translate: "Thank you very much for giving us this valuable opportunity. We are confident that by leveraging our experience in the application of AI technology and localization strategies in the Japanese market, and through collaboration with all of you, we can build a more flexible and efficient business model.",
+                note: "日语商务交流中频繁使用敬语（おります）和自谦语，“貴重な機会”“誠にありがとう”体现谦逊态度，长句中使用“を通じて”连接逻辑关系，符合日语表达习惯。",
+                delayBefore: 1200,
+                loadingDuration: 800,
+                typeSpeedTranslate: 10,
+                typeSpeedNote: 10
+            },
+            {
+                userId: 4,
+                original: "¡Quiero expresar mi gratitud a todos por esta oportunidad de colaboración! En América Latina, el mercado de la inteligencia artificial está creciendo a un ritmo impresionante, y creemos que al unir nuestras fuerzas con expertos de China, Estados Unidos y Japón, podemos desarrollar productos y servicios adaptados a las necesidades culturales y económicas de nuestra región, generando valor real para nuestros clientes y socios.",
+                delayBefore: 1800,
+                loadingDuration: 800,
+                typeSpeedInput: 20
+            },
+            {
+                userId: 1,
+                original: "非常感谢各位的积极回应！关于具体的合作落地，我建议我们先从三个方面入手：第一，建立多语言AI翻译系统，支持中日英西四国语言的实时精准翻译；第二，共同开发面向跨境电商的智能客服解决方案；第三，策划年度文化交流活动，促进四国企业间的相互了解。",
+                translate: "Thank you very much for your positive responses! Regarding the specific implementation of cooperation, I suggest we start with three aspects: first, establish a multilingual AI translation system that supports real-time and accurate translation of four languages including Chinese, Japanese, English and Spanish; second, jointly develop intelligent customer service solutions for cross-border e-commerce; third, plan annual cultural exchange activities to promote mutual understanding among enterprises from the four countries.",
+                note: "中文商务沟通中习惯使用“第一、第二、第三”的分点式表达，让合作框架更清晰，“精准翻译”“智能客服”等专业术语体现合作的技术属性。",
+                delayBefore: 2000,
+                loadingDuration: 700,
+                typeSpeedTranslate: 10,
+                typeSpeedNote: 10
+            },
+            {
+                userId: 2,
+                original: "I fully support this three-pronged approach! From a technical perspective, our team has extensive experience in natural language processing and machine learning algorithms, which can provide strong technical support for the multilingual translation system. We can also share our best practices in cross-border e-commerce customer service to ensure the solution meets international standards.",
+                translate: "我完全支持这种三管齐下的方式！从技术角度来看，我们团队在自然语言处理和机器学习算法方面拥有丰富经验，能够为多语言翻译系统提供强有力的技术支持。我们还可以分享我们在跨境电商客服方面的最佳实践，确保解决方案符合国际标准。",
+                note: "英语中“three-pronged approach”（三管齐下的方式）是商务领域常用比喻，“best practices”（最佳实践）体现专业度，长句中使用“which”从句补充说明技术优势。",
+                delayBefore: 1600,
+                loadingDuration: 700,
+                typeSpeedTranslate: 10,
+                typeSpeedNote: 10
+            },
+            {
+                userId: 3,
+                original: "この三つの取り組みについて、私たちも強く賛成します。特に多言語翻訳システムに関しては、日本語の敬語体系や文化的なニュアンスを正確に反映することが重要であり、我々の言語学者チームがこの点で貴重な貢献をすることができます。",
+                translate: "We also strongly agree with these three initiatives. Especially regarding the multilingual translation system, it is important to accurately reflect the Japanese honorific system and cultural nuances, and our team of linguists can make valuable contributions in this regard.",
+                note: "日语中“特に～に関しては”（特别是关于～）用于强调重点，“敬語体系”“文化的なニュアンス”体现对语言细节的重视，符合日本商务沟通注重细节的特点。",
+                delayBefore: 1400,
+                loadingDuration: 700,
+                typeSpeedTranslate: 10,
+                typeSpeedNote: 10
+            },
+            {
+                userId: 4,
+                original: "¡Estoy completamente de acuerdo con esta estrategia trifásica! En cuanto al mercado latinoamericano, es crucial adaptar los servicios al contexto cultural y lingüístico de cada país, ya que aunque compartimos el español, existen diferencias importantes entre México, Argentina, Chile y España. Nuestro equipo local puede proporcionar información valiosa sobre estas particularidades.",
+                delayBefore: 1900,
+                loadingDuration: 700,
+                typeSpeedInput: 20
+            },
+            {
+                userId: 1,
+                original: "非常高兴看到大家达成了共识！基于以上讨论，我建议我们在本月底前完成合作框架协议的起草工作，下月中旬召开线上签约仪式，同时启动翻译系统的原型开发，争取在三个月内完成第一版测试，半年内实现跨境电商客服方案的试点落地。",
+                translate: "I'm very pleased to see that we have reached a consensus! Based on the above discussions, I suggest we complete the drafting of the cooperation framework agreement by the end of this month, hold an online signing ceremony in the middle of next month, start the prototype development of the translation system at the same time, strive to complete the first version of testing within three months, and realize the pilot implementation of the cross-border e-commerce customer service solution within six months.",
+                note: "中文商务沟通中注重时间节点的明确性，“本月底前”“下月中旬”“三个月内”等具体时间表述体现执行力，“试点落地”是中国商务常用词，指方案的小规模实践。",
+                delayBefore: 2200,
+                loadingDuration: 600,
+                typeSpeedTranslate: 10,
+                typeSpeedNote: 10
+            },
+            {
+                userId: 2,
+                original: "This timeline is very reasonable and achievable! Our legal team can work with Chinese colleagues to draft the agreement, ensuring it complies with international business laws and protects the interests of all parties. Our technical team is ready to start the prototype development immediately after the agreement is signed.",
+                translate: "这个时间规划非常合理且可实现！我们的法务团队可以与中方同事共同起草协议，确保其符合国际商务法律并保护各方利益。我们的技术团队准备在协议签署后立即启动原型开发。",
+                note: "英语中“reasonable and achievable”（合理且可实现）是商务沟通中评价方案的常用表达，“complies with international business laws”体现对法律合规性的重视。",
+                delayBefore: 1700,
+                loadingDuration: 600,
+                typeSpeedTranslate: 10,
+                typeSpeedNote: 10
+            },
+            {
+                userId: 4,
+                original: "¡El cronograma propuesto es ambicioso pero realista! Nuestro equipo jurídico y técnico está listo para colaborar en la redacción del acuerdo y el desarrollo del prototipo, y además, podemos organizar reuniones de coordinación mensuales con representantes de los países de América Latina para asegurarnos de que las soluciones desarrolladas se adapten perfectamente a las necesidades del mercado y cumplan con las regulaciones locales de cada país.",
+                delayBefore: 2100,
+                loadingDuration: 600,
+                typeSpeedInput: 20
+            },
+            {
+                userId: 3,
+                original: "本日の議論は非常に生産的であり、皆様の熱意と専門知識に感銘を受けております。私たちは日本側として、合意されたタイムラインに従い、全力を尽くして協力してまいります。これからの連携が、四国間の友好関係とビジネス発展に大きく貢献することを願っております。",
+                translate: "Today's discussions have been very productive, and I am impressed by everyone's enthusiasm and expertise. As the Japanese side, we will do our utmost to cooperate in accordance with the agreed timeline. We hope that the future collaboration will greatly contribute to the friendly relations and business development among the four countries.",
+                note: "日语结束语常用“生産的であり”（富有成效）评价会议，“全力を尽くして”（竭尽全力）体现合作诚意，“～を願っております”表达美好祝愿，符合日本商务礼仪。",
+                delayBefore: 1800,
+                loadingDuration: 900,
+                typeSpeedTranslate: 10,
+                typeSpeedNote: 10
+            },
+            {
+                userId: 1,
+                original: "感谢田中先生的美好祝愿，也感谢John和Carlos的积极配合！我相信，通过我们四国团队的精诚合作、优势互补，一定能够实现我们共同的目标，开创互利共赢的美好未来。让我们携手并进，共创辉煌！",
+                translate: "Thank you for your kind wishes, Mr. Tanaka, and thank you for your active cooperation, John and Carlos! I believe that through the sincere cooperation and complementary advantages of our four-country teams, we will surely achieve our common goals and create a bright future of mutual benefit and win-win results. Let us hand in hand and create brilliance together!",
+                note: "中文结束语常用“精诚合作”“优势互补”“互利共赢”等四字短语，增强语言的感染力和正式性，“携手并进，共创辉煌”是商务场合常用的励志表达。",
+                delayBefore: 2000,
+                loadingDuration: 900,
+                typeSpeedTranslate: 10,
+                typeSpeedNote: 10
+            },
+            {
+                userId: 4,
+                original: "¡Gracias a todos por esta fantástica reunión! Estoy seguro de que nuestra colaboración será un éxito rotundo y que juntos construiremos un puente entre diferentes culturas y mercados, creando oportunidades únicas para todos los involucrados. ¡Muchas gracias y hasta la próxima reunión!",
+                delayBefore: 2300,
+                loadingDuration: 900,
+                typeSpeedInput: 20
+            }
+        ];
+
+        const USERS = {
+            1: { name: "林晓",    avatar: "林", side: "left", avatarColor: "#7CBB00" },
+            2: { name: "Jack",   avatar: "J", side: "left", avatarColor: "#F65314" },
+            3: { name: "佐藤由纪", avatar: "由", side: "left", avatarColor: "#00A1F1" },
+            4: { name: "Carlos", avatar: "C", side: "right", avatarColor: "#FFBB00" },
+        };
+
+        let buttonStateChangeTimer = null;
+        const MIN_ANIMATION_DURATION = 500;
+
+        function updateSendButtonState(forceEnable = false) {
+            const hasContent = inputBox.value.trim().length > 0 || forceEnable;
+            
+            if (buttonStateChangeTimer) clearTimeout(buttonStateChangeTimer);
+
+            if (hasContent && sendBtn.disabled) {
+                sendBtn.disabled = false;
+                buttonStateChangeTimer = setTimeout(() => {
+                    sendBtn.disabled = inputBox.value.trim().length === 0;
+                }, MIN_ANIMATION_DURATION);
+            } else if (!hasContent) {
+                sendBtn.disabled = true;
+            }
+        }
+
+        function scrollInputToBottom() {
+            inputBox.scrollTop = inputBox.scrollHeight;
+        }
+
+        function autoResizeInput() {
+            inputBox.style.height = 'auto';
+            const newHeight = Math.min(inputBox.scrollHeight, 120);
+            inputBox.style.height = `${newHeight}px`;
+            scrollInputToBottom();
+        }
+
+        function scrollBottom() {
+            requestAnimationFrame(() => {
+                chatArea.scrollTop = chatArea.scrollHeight;
+            });
+        }
+
+        function detectLineChange(el, text, currentLength) {
+            const prevHeight = el.offsetHeight;
+            const prevWidth = el.offsetWidth;
+            
+            const tempText = el.textContent;
+            el.textContent = text.substring(0, currentLength + 1);
+            const newHeight = el.offsetHeight;
+            const newWidth = el.offsetWidth;
+            
+            el.textContent = tempText;
+            
+            if (newHeight > prevHeight || newWidth !== prevWidth) {
+                el.classList.add('line-change');
+                setTimeout(() => {
+                    el.classList.remove('line-change');
+                }, 300);
+            }
+        }
+
+        async function typeTo(el, text, ms = 20) {
+            el.textContent = '';
+            const batchSize = 10;
+            let index = 0;
+            await new Promise(r => setTimeout(r, 500));
+            while (index < text.length) {
+                const endIndex = Math.min(index + batchSize, text.length);
+                for (let i = index; i < endIndex; i++) {
+                    el.textContent += text.charAt(i);
+                    detectLineChange(el, text, i);
+                    await new Promise(r => setTimeout(r, ms));
+                }
+                scrollBottom();
+                index = endIndex;
+                await new Promise(r => requestAnimationFrame(r));
+            }
+        }
+
+        async function user4TypeInInput(text, speed = 30) {
+            inputBox.value = '';
+            inputBox.focus();
+            scrollBottom();
+            updateSendButtonState(false);
+            
+            const batchSize = 8;
+            let index = 0;
+            let isFirstEnable = true;
+            
+            while (index < text.length) {
+                const endIndex = Math.min(index + batchSize, text.length);
+                for (let i = index; i < endIndex; i++) {
+                    inputBox.value += text.charAt(i);
+                    inputBox.dispatchEvent(new Event('input'));
+                    autoResizeInput();
+                    
+                    if (isFirstEnable && inputBox.value.trim().length > 0) {
+                        updateSendButtonState(true);
+                        isFirstEnable = false;
+                    }
+                    
+                    await new Promise(r => setTimeout(r, speed));
+                }
+                scrollBottom();
+                index = endIndex;
+                await new Promise(r => requestAnimationFrame(r));
+            }
+            
+            await new Promise(r => setTimeout(r, MIN_ANIMATION_DURATION));
+            sendBtn.click();
+        }
+
+        async function sendMessage(msgConfig) {
+            const user = USERS[msgConfig.userId];
+            const isUser4 = msgConfig.userId === 4;
+            const isRight = user.side === 'right';
+
+            if (isUser4) {
+                await new Promise(r => setTimeout(r, msgConfig.delayBefore));
+                await user4TypeInInput(msgConfig.original, msgConfig.typeSpeedInput);
+                return;
+            }
+
+            await new Promise(r => setTimeout(r, msgConfig.delayBefore));
+
+            const fragment = document.createDocumentFragment();
+            
+            const row = document.createElement('div');
+            row.className = `msg-row ${isRight ? 'msg-right' : 'msg-left'}`;
+
+            const avatar = document.createElement('div');
+            avatar.className = 'avatar';
+            avatar.textContent = user.avatar;
+            const hexColor = user.avatarColor;
+            const hexToRgba = (hex, opacity = 0.5) => {
+                const r = parseInt(hex.slice(1, 3), 16);
+                const g = parseInt(hex.slice(3, 5), 16);
+                const b = parseInt(hex.slice(5, 7), 16);
+                return `rgba(${r}, ${g}, ${b}, ${opacity})`;
+            };
+            avatar.style.backgroundColor = hexToRgba(hexColor);
+            
+            const group = document.createElement('div');
+            group.className = 'msg-group';
+
+            const bubbleOriginal = document.createElement('div');
+            bubbleOriginal.className = `bubble ${isRight ? 'bubble-right' : 'bubble-original'}`;
+            bubbleOriginal.textContent = msgConfig.original;
+
+            const loading = document.createElement('div');
+            loading.className = 'loading';
+            bubbleOriginal.appendChild(loading);
+
+            group.appendChild(bubbleOriginal);
+            row.appendChild(avatar);
+            row.appendChild(group);
+            fragment.appendChild(row);
+            
+            chatArea.appendChild(fragment);
+            scrollBottom();
+
+            playSound('receive');
+
+            await new Promise(r => setTimeout(r, msgConfig.loadingDuration));
+            bubbleOriginal.removeChild(loading);
+
+            const bubbleTr = document.createElement('div');
+            bubbleTr.className = 'bubble bubble-translate';
+            group.appendChild(bubbleTr);
+            await typeTo(bubbleTr, msgConfig.translate, msgConfig.typeSpeedTranslate);
+
+            const bubbleNote = document.createElement('div');
+            bubbleNote.className = 'bubble bubble-note';
+            group.appendChild(bubbleNote);
+            await typeTo(bubbleNote, msgConfig.note, msgConfig.typeSpeedNote);
+        }
+
+        async function sendUser4Message(text) {
+            inputBox.value = '';
+            inputBox.dispatchEvent(new Event('input'));
+            updateSendButtonState();
+            autoResizeInput();
+            
+            await new Promise(r => setTimeout(r, 50));
+            
+            const user = USERS[4];
+            const isRight = user.side === 'right';
+            
+            const fragment = document.createDocumentFragment();
+            
+            const row = document.createElement('div');
+            row.className = `msg-row ${isRight ? 'msg-right' : 'msg-left'}`;
+
+            const avatar = document.createElement('div');
+            avatar.className = 'avatar';
+            avatar.textContent = user.avatar;
+            const hexColor = user.avatarColor;
+            const hexToRgba = (hex, opacity = 0.5) => {
+                const r = parseInt(hex.slice(1, 3), 16);
+                const g = parseInt(hex.slice(3, 5), 16);
+                const b = parseInt(hex.slice(5, 7), 16);
+                return `rgba(${r}, ${g}, ${b}, ${opacity})`;
+            };
+            avatar.style.backgroundColor = hexToRgba(hexColor);
+
+            const group = document.createElement('div');
+            group.className = 'msg-group';
+
+            const bubbleOriginal = document.createElement('div');
+            bubbleOriginal.className = `bubble ${isRight ? 'bubble-right' : 'bubble-original'}`;
+            bubbleOriginal.textContent = text;
+
+            const loading = document.createElement('div');
+            loading.className = 'loading';
+            bubbleOriginal.appendChild(loading);
+
+            group.appendChild(bubbleOriginal);
+            row.appendChild(avatar);
+            row.appendChild(group);
+            fragment.appendChild(row);
+            
+            chatArea.appendChild(fragment);
+            scrollBottom();
+
+            playSound('send');
+
+            await new Promise(r => setTimeout(r, 500));
+            bubbleOriginal.removeChild(loading);
+        }
+
+        async function playMessageQueue() {
+            initSoundEffects();
+            
+            for (let i = 0; i < MESSAGE_QUEUE.length; i++) {
+                try {
+                    const msg = MESSAGE_QUEUE[i];
+                    await sendMessage(msg);
+                    if (i % 5 === 0) {
+                        await new Promise(r => requestAnimationFrame(r));
+                    }
+                } catch (error) {
+                    console.error(`发送第${i+1}条消息时出错:`, error);
+                    continue;
+                }
+            }
+            console.log('长对话播放完成，共发送', MESSAGE_QUEUE.length, '条消息');
+        }
+
+        sendBtn.onclick = async () => {
+            const val = inputBox.value.trim();
+            if (!val) return;
+            await sendUser4Message(val);
+        };
+
+        inputBox.addEventListener('input', () => {
+            updateSendButtonState();
+            autoResizeInput();
+        });
+
+        window.onload = () => {
+            autoResizeInput();
+            updateSendButtonState();
+            console.log('开始播放长对话，共', MESSAGE_QUEUE.length, '条消息');
+            playMessageQueue();
+        };
+
+        window.addEventListener('resize', () => {
+            scrollBottom();
+            autoResizeInput();
+        });
+    </script>
+</body>
+</html>
